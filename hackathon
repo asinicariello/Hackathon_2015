@@ -128,6 +128,31 @@ public final class Hackathon {
         }
     }
 
+    private static void output(Map<String, Map<String, Integer>> outputMap)
+            throws BiffException, IOException, WriteException {
+        WritableWorkbook outputBook;
+        outputBook = Workbook.createWorkbook(new File("output.xls"));
+        WritableSheet wsheet = outputBook.createSheet("First Sheet", 0);
+        for (int i = 0; i < outputMap.size(); i++) {
+            Label label = new Label(2 * i, 0, "Candidate " + (i + 1));
+            wsheet.addCell(label);
+            for (int j = 1; j < outputMap.get("Candidate " + (i + 1)).size() + 1; j++) {
+                Label jobName = new Label(2 * i, j, "Job " + j);
+                wsheet.addCell(jobName);
+                int q = outputMap.get("Candidate " + (i + 1)).get("Job " + j);
+                String qual = "Qualified";
+                if (q == 0) {
+                    qual = "Not Qualified";
+                }
+                Label qualified = new Label(2 * i + 1, j, qual);
+                wsheet.addCell(qualified);
+            }
+        }
+        outputBook.write();
+        outputBook.close();
+    }
+
+
     /**
      * Main method.
      * 
@@ -171,5 +196,6 @@ public final class Hackathon {
             matchBasedOnMajors(matches, candidateMajors, jobMajors, i);
         }
         System.out.println(matches);
+        output(matches);
     }
 }
