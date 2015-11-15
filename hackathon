@@ -133,18 +133,18 @@ public final class Hackathon {
         WritableWorkbook outputBook;
         outputBook = Workbook.createWorkbook(new File("output.xls"));
         WritableSheet wsheet = outputBook.createSheet("First Sheet", 0);
-        for (int i = 0; i < outputMap.size(); i++) {
-            Label label = new Label(2 * i, 0, "Candidate " + (i + 1));
+        for (int i = 1; i < outputMap.size() + 1; i++) {
+            Label label = new Label(i, 0, "Candidate " + (i));
             wsheet.addCell(label);
-            for (int j = 1; j < outputMap.get("Candidate " + (i + 1)).size() + 1; j++) {
-                Label jobName = new Label(2 * i, j, "Job " + j);
+            for (int j = 1; j < outputMap.get("Candidate " + (i)).size() + 1; j++) {
+                Label jobName = new Label(0, j, "Job " + j);
                 wsheet.addCell(jobName);
-                int q = outputMap.get("Candidate " + (i + 1)).get("Job " + j);
+                int q = outputMap.get("Candidate " + (i)).get("Job " + j);
                 String qual = "Qualified";
                 if (q == 0) {
                     qual = "Not Qualified";
                 }
-                Label qualified = new Label(2 * i + 1, j, qual);
+                Label qualified = new Label(i, j, qual);
                 wsheet.addCell(qualified);
             }
         }
