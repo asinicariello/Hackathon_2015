@@ -107,6 +107,27 @@ public final class Hackathon {
         return majors;
     }
 
+    private static void matchBasedOnMajors(
+            Map<String, Map<String, Integer>> matches,
+            Map<String, Set<String>> candidateMajors,
+            Map<String, Set<String>> jobMajors, int i) {
+        Iterator<String> it = candidateMajors.get("Candidate " + i).iterator();
+        while (it.hasNext()) {
+            String word = it.next();
+            for (int j = 1; j < jobMajors.size() + 1; j++) {
+                Iterator<String> itr = jobMajors.get("Job " + j).iterator();
+                while (itr.hasNext()) {
+                    String jobMajor = itr.next();
+                    if (jobMajor.toUpperCase().contains(word.toUpperCase())
+                            || jobMajor.equals("All Majors")
+                            || jobMajor.equals("Undergraduate Majors")) {
+                        matches.get("Candidate " + i).put("Job " + j, 1);
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Main method.
      * 
@@ -121,20 +142,19 @@ public final class Hackathon {
                 "data/Students-Data"));
         Map<String, Map<String, String>> candidates = importStudentMap(studentFile);
 
-        Map<String, Set<String>> jobMajors = new HashMap<>();
-        Map<String, Set<String>> candidateMajors = new HashMap<>();
-
         Map<String, Map<String, Integer>> matches = new HashMap<>();
         for (int i = 1; i < candidates.size() + 1; i++) {
             String candidateKey = "Candidate " + i;
             Map<String, Integer> jobMatch = new HashMap<>();
             for (int j = 1; j < jobTitles.size() + 1; j++) {
                 String jobKey = "Job " + j;
-                jobMatch.put(jobKey, 1);
+                jobMatch.put(jobKey, 0);
             }
             matches.put(candidateKey, jobMatch);
         }
 
+        Map<String, Set<String>> jobMajors = new HashMap<>();
+        Map<String, Set<String>> candidateMajors = new HashMap<>();
         for (int i = 1; i < jobTitles.size() + 1; i++) {
             String jobNum = "Job " + i;
             jobMajors.put(jobNum, setOfMajors(jobTitles.get(jobNum)
@@ -147,22 +167,9 @@ public final class Hackathon {
                     + ", " + candidates.get(canNum).get("Past Degrees");
             candidateMajors.put(canNum, setOfMajors(text));
         }
-
-        Set<String> test = candidateMajors.get("Candidate 1");
-        System.out.println(test);
-        Iterator<String> it = test.iterator();
-        while (it.hasNext()) {
-            String word = it.next();
-            for (int j = 1; j < jobMajors.size() + 1; j++) {
-                Iterator<String> itr = jobMajors.get("Job " + j).iterator();
-                while (itr.hasNext()) {
-                    String jobMajor = itr.next();
-                    if (jobMajor.toUpperCase().contains(word.toUpperCase())) {
-                        System.out.println(j);
-                    }
-                }
-            }
+        for (int i = 1; i < candidates.size() + 1; i++) {
+            matchBasedOnMajors(matches, candidateMajors, jobMajors, i);
         }
-
+        System.out.println(matches);
     }
 }
