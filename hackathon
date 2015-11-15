@@ -1,7 +1,10 @@
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import jxl.Sheet;
 import jxl.Workbook;
@@ -37,7 +40,7 @@ public final class Hackathon {
         Map<String, Map<String, String>> candidates = new HashMap<>();
         for (int r = 1; r < inputStudents.getRows(); r++) {
             Map<String, String> contents = new HashMap<>();
-            for (int c = 1; c < inputStudents.getColumns(); c++) {
+            for (int c = 0; c < inputStudents.getColumns(); c++) {
                 String header = inputStudents.getCell(c, 0).getContents();
                 String newHeader = header;
                 if (contents.containsKey(header)) {
@@ -55,6 +58,55 @@ public final class Hackathon {
         return candidates;
     }
 
+    private static String nextWordOrSeparator(String text, int position,
+            Set<String> separators) {
+        String answer;
+        int end = position;
+        String next = text.substring(end, end + 1);
+        if (separators.contains(next)) {
+            while (separators.contains(next) && end < text.length()) {
+                end++;
+                if (end < text.length()) {
+                    next = text.substring(end, end + 1);
+                }
+            }
+        } else {
+            while (!separators.contains(next) && end < text.length()) {
+                end++;
+                if (end < text.length()) {
+                    next = text.substring(end, end + 1);
+                }
+            }
+        }
+        answer = text.substring(position, end);
+        return answer;
+    }
+
+    private static Set<String> setOfMajors(String text) {
+        Set<String> separators = new HashSet<>();
+        separators.add(", ");
+        separators.add("Associate");
+        separators.add("Master");
+        separators.add("Bachelor");
+        separators.add("PhD");
+        separators.add("; ");
+        separators.add(";");
+        separators.add(",");
+        separators.add(" ,");
+        Set<String> majors = new HashSet<>();
+        int pointer = 0;
+        while (pointer < text.length()) {
+            String majorReturned = nextWordOrSeparator(text, pointer,
+                    separators);
+            if (!separators.contains(majorReturned)) {
+                majors.add(majorReturned);
+                pointer += majorReturned.length();
+            }
+            pointer++;
+        }
+        return majors;
+    }
+
     /**
      * Main method.
      * 
@@ -69,7 +121,48 @@ public final class Hackathon {
                 "data/Students-Data"));
         Map<String, Map<String, String>> candidates = importStudentMap(studentFile);
 
-        System.out.println(jobTitles.get("Job 1"));
-        System.out.println(candidates.get("Candidate 1"));
+        Map<String, Set<String>> jobMajors = new HashMap<>();
+        Map<String, Set<String>> candidateMajors = new HashMap<>();
+
+        Map<String, Map<String, Integer>> matches = new HashMap<>();
+        for (int i = 1; i < candidates.size() + 1; i++) {
+            String candidateKey = "Candidate " + i;
+            Map<String, Integer> jobMatch = new HashMap<>();
+            for (int j = 1; j < jobTitles.size() + 1; j++) {
+                String jobKey = "Job " + j;
+                jobMatch.put(jobKey, 1);
+            }
+            matches.put(candidateKey, jobMatch);
+        }
+
+        for (int i = 1; i < jobTitles.size() + 1; i++) {
+            String jobNum = "Job " + i;
+            jobMajors.put(jobNum, setOfMajors(jobTitles.get(jobNum)
+                    .get("Major")));
+        }
+        for (int i = 1; i < candidates.size() + 1; i++) {
+            String canNum = "Candidate " + i;
+            String text = candidates.get(canNum).get("Major") + ", "
+                    + candidates.get(canNum).get("Minor / Specialization")
+                    + ", " + candidates.get(canNum).get("Past Degrees");
+            candidateMajors.put(canNum, setOfMajors(text));
+        }
+
+        Set<String> test = candidateMajors.get("Candidate 1");
+        System.out.println(test);
+        Iterator<String> it = test.iterator();
+        while (it.hasNext()) {
+            String word = it.next();
+            for (int j = 1; j < jobMajors.size() + 1; j++) {
+                Iterator<String> itr = jobMajors.get("Job " + j).iterator();
+                while (itr.hasNext()) {
+                    String jobMajor = itr.next();
+                    if (jobMajor.toUpperCase().contains(word.toUpperCase())) {
+                        System.out.println(j);
+                    }
+                }
+            }
+        }
+
     }
 }
