@@ -6,9 +6,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import jxl.Cell;
 import jxl.Sheet;
 import jxl.Workbook;
 import jxl.read.biff.BiffException;
+import jxl.write.Label;
+import jxl.write.WritableSheet;
+import jxl.write.WritableWorkbook;
 import jxl.write.WriteException;
 
 public final class Hackathon {
@@ -20,22 +24,32 @@ public final class Hackathon {
         // no code needed here
     }
 
+    /**
+     * Takes the imported excel file of Jobs and organizes it into a map.
+     *
+     * @param file
+     * @return
+     */
     private static Map<String, Map<String, String>> importJobMap(Workbook file) {
         Sheet inputJobs = file.getSheet(0);
         Map<String, Map<String, String>> jobTitles = new HashMap<>();
         for (int r = 1; r < inputJobs.getRows(); r++) {
             Map<String, String> contents = new HashMap<>();
             for (int c = 0; c < inputJobs.getColumns(); c++) {
-                contents.put(inputJobs.getCell(c, 0).getContents(), inputJobs
-                        .getCell(c, r).getContents());
+                contents.put(inputJobs.getCell(c, 0).getContents(), inputJobs.getCell(c, r).getContents());
             }
             jobTitles.put("Job " + r, contents);
         }
         return jobTitles;
     }
 
-    private static Map<String, Map<String, String>> importStudentMap(
-            Workbook file) {
+    /**
+     * Takes the imported excel file of resumes and organizes it into a map.
+     *
+     * @param file
+     * @return
+     */
+    private static Map<String, Map<String, String>> importStudentMap(Workbook file) {
         Sheet inputStudents = file.getSheet(0);
         Map<String, Map<String, String>> candidates = new HashMap<>();
         for (int r = 1; r < inputStudents.getRows(); r++) {
@@ -50,16 +64,53 @@ public final class Hackathon {
                         }
                     }
                 }
-                contents.put(newHeader, inputStudents.getCell(c, r)
-                        .getContents());
+                contents.put(newHeader, inputStudents.getCell(c, r).getContents());
             }
             candidates.put("Candidate " + r, contents);
         }
         return candidates;
     }
 
-    private static String nextWordOrSeparator(String text, int position,
-            Set<String> separators) {
+    /**
+     * Returns the first "word" (maximal length string of characters not in
+     * {@code separators}) or "separator string" (maximal length string of
+     * characters in {@code separators}) in the given {@code text} starting at
+     * the given {@code position}.
+     *
+     * @param text
+     *            the {@code String} from which to get the word or separator
+     *            string
+     * @param position
+     *            the starting index
+     * @param separators
+     *            the {@code Set} of separator characters
+     * @return the first word or separator string found in {@code text} starting
+     *         at index {@code position}
+     * @requires
+     *
+     *           <pre>
+     * {@code 0 <= position < |text|}
+     *           </pre>
+     *
+     * @ensures
+     *
+     *          <pre>
+     * {@code nextWordOrSeparator =
+     *   text[position, position + |nextWordOrSeparator|)  and
+     * if entries(text[position, position + 1)) intersection separators = {}
+     * then
+     *   entries(nextWordOrSeparator) intersection separators = {}  and
+     *   (position + |nextWordOrSeparator| = |text|  or
+     *    entries(text[position, position + |nextWordOrSeparator| + 1))
+     *      intersection separators /= {})
+     * else
+     *   entries(nextWordOrSeparator) is subset of separators  and
+     *   (position + |nextWordOrSeparator| = |text|  or
+     *    entries(text[position, position + |nextWordOrSeparator| + 1))
+     *      is not subset of separators)}
+     *          </pre>
+     */
+    private static String nextWordOrSeparator(String text, int position, Set<String> separators) {
         String answer;
         int end = position;
         String next = text.substring(end, end + 1);
@@ -82,6 +133,54 @@ public final class Hackathon {
         return answer;
     }
 
+    /**
+     * Creates a six-digit integer to represent the graduation requirement for a
+     * job.
+     *
+     * @param text
+     * @return
+     */
+    private static int intOfET(String text) {
+        int employmentType = 0;
+        if (text.contains("Career Employment")) {
+            employmentType = 201606;
+        } else {
+            employmentType = 500000;
+        }
+
+        return employmentType;
+    }
+
+    /**
+     * Creates a six-digit integer to represent the graduation date of a
+     * student.
+     *
+     * @param text
+     * @return
+     */
+    private static int intOfGrad(String text) {
+        Set<String> separators = new HashSet<>();
+        separators.add("/");
+        int gradDate = 0;
+        int pointer = 0;
+        if (!text.isEmpty()) {
+            String month = nextWordOrSeparator(text, pointer, separators);
+            pointer += month.length();
+            pointer++;
+            String year = nextWordOrSeparator(text, pointer, separators);
+            gradDate = 100 * Integer.parseInt(year);
+            gradDate += Integer.parseInt(month);
+        }
+        return gradDate;
+    }
+
+    /**
+     * Creates a set listing all majors, minors, and prior degrees of a
+     * candidate or the required majors for a job.
+     *
+     * @param text
+     * @return
+     */
     private static Set<String> setOfMajors(String text) {
         Set<String> separators = new HashSet<>();
         separators.add(", ");
@@ -96,8 +195,7 @@ public final class Hackathon {
         Set<String> majors = new HashSet<>();
         int pointer = 0;
         while (pointer < text.length()) {
-            String majorReturned = nextWordOrSeparator(text, pointer,
-                    separators);
+            String majorReturned = nextWordOrSeparator(text, pointer, separators);
             if (!separators.contains(majorReturned)) {
                 majors.add(majorReturned);
                 pointer += majorReturned.length();
@@ -107,10 +205,16 @@ public final class Hackathon {
         return majors;
     }
 
-    private static void matchBasedOnMajors(
-            Map<String, Map<String, Integer>> matches,
-            Map<String, Set<String>> candidateMajors,
-            Map<String, Set<String>> jobMajors, int i) {
+    /**
+     * Compares student major sets to job major sets to find matches.
+     * 
+     * @param matches
+     * @param candidateMajors
+     * @param jobMajors
+     * @param i
+     */
+    private static void matchBasedOnMajors(Map<String, Map<String, Integer>> matches,
+            Map<String, Set<String>> candidateMajors, Map<String, Set<String>> jobMajors, int i) {
         Iterator<String> it = candidateMajors.get("Candidate " + i).iterator();
         while (it.hasNext()) {
             String word = it.next();
@@ -119,52 +223,81 @@ public final class Hackathon {
                 while (itr.hasNext()) {
                     String jobMajor = itr.next();
                     if (jobMajor.toUpperCase().contains(word.toUpperCase())
-                            || jobMajor.equals("All Majors")
-                            || jobMajor.equals("Undergraduate Majors")) {
+                            || jobMajor.toUpperCase().contains("ALL MAJOR")
+                            || jobMajor.toUpperCase().contains("UNDERGRADUATE MAJOR")) {
                         matches.get("Candidate " + i).put("Job " + j, 1);
+                    } else {
+                        matches.get("Candidate " + i).put("Job " + j, 0);
                     }
                 }
             }
         }
     }
 
-    private static void output(Map<String, Map<String, Integer>> outputMap)
+    /**
+     * Compares graduation date of students to the required graduation date of
+     * jobs to find matches
+     * 
+     * @param matches
+     * @param candidateGrad
+     * @param jobET
+     */
+    private static void matchBasedOnGrad(Map<String, Map<String, Integer>> matches, Map<String, Integer> candidateGrad,
+            Map<String, Integer> jobET) {
+        for (int k = 1; k < candidateGrad.size() + 1; k++) {
+            for (int j = 1; j < jobET.size() + 1; j++) {
+                if (candidateGrad.get("Candidate " + k) >= jobET.get("Job " + j)) {
+                    matches.get("Candidate " + k).put("Job " + j, 0);
+                } else {
+                    matches.get("Candidate " + k).put("Job " + j, 1);
+                }
+            }
+        }
+    }
+
+    /**
+     * Outputs the qualifications or lack of qualifications into the excel
+     * document.
+     * 
+     * @param matches
+     * @param wsheet
+     * @param nQString
+     * @throws BiffException
+     * @throws IOException
+     * @throws WriteException
+     */
+    private static void output(Map<String, Map<String, Integer>> matches, WritableSheet wsheet, String nQString)
             throws BiffException, IOException, WriteException {
-        WritableWorkbook outputBook;
-        outputBook = Workbook.createWorkbook(new File("output.xls"));
-        WritableSheet wsheet = outputBook.createSheet("First Sheet", 0);
-        for (int i = 1; i < outputMap.size() + 1; i++) {
-            Label label = new Label(i, 0, "Candidate " + (i));
-            wsheet.addCell(label);
-            for (int j = 1; j < outputMap.get("Candidate " + (i)).size() + 1; j++) {
-                Label jobName = new Label(0, j, "Job " + j);
-                wsheet.addCell(jobName);
-                int q = outputMap.get("Candidate " + (i)).get("Job " + j);
+        for (int i = 1; i < matches.size() + 1; i++) {
+            for (int j = 1; j < matches.get("Candidate " + (i)).size() + 1; j++) {
+                Cell content = wsheet.getCell(i, j);
+                int q = matches.get("Candidate " + (i)).get("Job " + j);
                 String qual = "Qualified";
-                if (q == 0) {
-                    qual = "Not Qualified";
+                if (!content.getContents().equals("Qualified")) {
+                    if (q == 0) {
+                        qual = "" + content.getContents() + nQString;
+                    }
+                } else {
+                    if (q == 0) {
+                        qual = nQString;
+                    }
                 }
                 Label qualified = new Label(i, j, qual);
                 wsheet.addCell(qualified);
             }
         }
-        outputBook.write();
-        outputBook.close();
     }
-
 
     /**
      * Main method.
-     * 
+     *
      * @param args
      *            the command line arguments; unused here
      */
-    public static void main(String[] args) throws BiffException, IOException,
-            WriteException {
+    public static void main(String[] args) throws BiffException, IOException, WriteException {
         Workbook jobFile = Workbook.getWorkbook(new File("data/Jobs-Data"));
         Map<String, Map<String, String>> jobTitles = importJobMap(jobFile);
-        Workbook studentFile = Workbook.getWorkbook(new File(
-                "data/Students-Data"));
+        Workbook studentFile = Workbook.getWorkbook(new File("data/Students-Data"));
         Map<String, Map<String, String>> candidates = importStudentMap(studentFile);
 
         Map<String, Map<String, Integer>> matches = new HashMap<>();
@@ -173,29 +306,55 @@ public final class Hackathon {
             Map<String, Integer> jobMatch = new HashMap<>();
             for (int j = 1; j < jobTitles.size() + 1; j++) {
                 String jobKey = "Job " + j;
-                jobMatch.put(jobKey, 0);
+                jobMatch.put(jobKey, 1);
             }
             matches.put(candidateKey, jobMatch);
         }
 
+        Map<String, Integer> jobET = new HashMap<>();
+        Map<String, Integer> candidateGrad = new HashMap<>();
         Map<String, Set<String>> jobMajors = new HashMap<>();
         Map<String, Set<String>> candidateMajors = new HashMap<>();
         for (int i = 1; i < jobTitles.size() + 1; i++) {
             String jobNum = "Job " + i;
-            jobMajors.put(jobNum, setOfMajors(jobTitles.get(jobNum)
-                    .get("Major")));
+            jobET.put(jobNum, intOfET(jobTitles.get(jobNum).get("Employment - Type")));
+            jobMajors.put(jobNum, setOfMajors(jobTitles.get(jobNum).get("Major")));
         }
         for (int i = 1; i < candidates.size() + 1; i++) {
             String canNum = "Candidate " + i;
+            candidateGrad.put(canNum, intOfGrad(candidates.get(canNum).get("Graduation Year")));
             String text = candidates.get(canNum).get("Major") + ", "
-                    + candidates.get(canNum).get("Minor / Specialization")
-                    + ", " + candidates.get(canNum).get("Past Degrees");
+                    + candidates.get(canNum).get("Minor / Specialization") + ", "
+                    + candidates.get(canNum).get("Past Degrees");
             candidateMajors.put(canNum, setOfMajors(text));
         }
+
+        WritableWorkbook outputBook = Workbook.createWorkbook(new File("output.xls"));
+        WritableSheet wsheet = outputBook.createSheet("First Sheet", 0);
+        for (int i = 1; i < matches.size() + 1; i++) {
+            Label label = new Label(i, 0, "Candidate " + (i));
+            wsheet.addCell(label);
+            for (int j = 1; j < matches.get("Candidate " + (i)).size() + 1; j++) {
+                Label jobName = new Label(0, j, "Job " + j);
+                wsheet.addCell(jobName);
+            }
+        }
+
         for (int i = 1; i < candidates.size() + 1; i++) {
             matchBasedOnMajors(matches, candidateMajors, jobMajors, i);
         }
-        System.out.println(matches);
-        output(matches);
+
+        output(matches, wsheet, "Candidate does not fulfill required major. ");
+
+        for (int i = 1; i < candidates.size() + 1; i++) {
+            matchBasedOnGrad(matches, candidateGrad, jobET);
+        }
+
+        output(matches, wsheet, "Candidate does not fulfill requried graduation date. ");
+
+        outputBook.write();
+        outputBook.close();
+
+        System.out.println("A spreadsheet of matches has been created and is titled \"output.xls\"");
     }
 }
